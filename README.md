@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dev Termin
 
-## Getting Started
+An Uzbek IT dictionary built with Next.js, FastAPI, PostgreSQL, SQLAlchemy, and psycopg v3.
 
-First, run the development server:
+## Backend
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Install and run with the same Python environment. The existing `backend/venv` is a Windows environment and cannot run under WSL.
+
+From the project root in PowerShell:
+
+```powershell
+& .\backend\venv\Scripts\python.exe -m pip install -r backend/requirements.txt
+& .\backend\venv\Scripts\python.exe -m uvicorn main:app --app-dir backend --reload --host 0.0.0.0 --port 8000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+For a fresh Linux/WSL environment:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+python3 -m venv backend/.venv
+backend/.venv/bin/python -m pip install -r backend/requirements.txt
+backend/.venv/bin/python -m uvicorn main:app --app-dir backend --reload --port 8000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+If `backend/.env` is missing, copy `backend/.env.example` and fill in actual credentials:
 
-## Learn More
+```dotenv
+DATABASE_URL=postgresql+psycopg://USERNAME:PASSWORD@HOST:5432/DATABASE_NAME
+```
 
-To learn more about Next.js, take a look at the following resources:
+Encode special characters in URL credentials. The backend loads this file relative to `database.py`, regardless of the working directory. Environment variables take precedence. Credentials and virtual environments are ignored by Git and excluded from Docker builds.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+PostgreSQL must be running and the database must exist. Startup creates the `terms` table if needed; it does not seed terms. A timeout at `localhost:5432` means PostgreSQL is unavailable from the environment running Python. Windows and WSL can have different localhost addresses.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Verify the API:
 
-## Deploy on Vercel
+```bash
+curl http://localhost:8000/health
+curl 'http://localhost:8000/terms?search=Docker&category=DevOps'
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`GET /terms` returns `id`, `name`, `description`, and `category`, sorted by name. Search matches names and descriptions without case sensitivity; categories match the full category name without case sensitivity, for example `DevOps`. An empty table returns `[]`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Frontend
+
+Copy `frontend/.env.example` to `frontend/.env.local` if missing:
+
+```dotenv
+BACKEND_URL=http://127.0.0.1:8000
+```
+
+This address must be reachable from the Next.js server, including across Windows/WSL environments. In Docker use the backend service hostname instead of localhost.
+
+From the project root:
+
+```bash
+npm ci
+npm run dev
+```
+
+Open http://localhost:3000. Root scripts target `frontend/`. Search and category changes request `/api/terms`, which forwards to FastAPI. Existing Uzbek translations come from `frontend/data/terms.ts`; new API terms display their descriptions without a translation until one is added. Translation searches include matching database records through the proxy.
+
+When the API is unavailable, the page shows a notice and keeps the original local dictionary available under “Barchasi”. A successful empty API response shows the empty result state. Local terms have no category metadata.
+
+```bash
+npm run lint
+npm run build
+npm start
+```
+
+## Docker
+
+The Dockerfile builds the frontend standalone server. Run FastAPI and PostgreSQL separately.
+
+```bash
+docker build -t dev-termin .
+docker run --rm -p 3000:3000 -e BACKEND_URL=http://BACKEND_HOST:8000 dev-termin
+```
+
+Set `BACKEND_URL` at runtime so the same image works in different environments. Docker must be able to resolve and reach `BACKEND_HOST`.

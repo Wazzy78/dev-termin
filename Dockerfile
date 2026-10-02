@@ -15,10 +15,10 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 
-COPY --from=builder --chown=node:node /app/.next/standalone ./
-COPY --from=builder --chown=node:node /app/.next/static ./.next/static
-COPY --from=builder --chown=node:node /app/public ./public
+COPY --from=builder --chown=node:node /app/frontend/.next/standalone ./
+COPY --from=builder --chown=node:node /app/frontend/.next/static ./frontend/.next/static
+COPY --from=builder --chown=node:node /app/public ./frontend/public
 
 USER node
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["node", "frontend/server.js"]
